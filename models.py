@@ -23,7 +23,17 @@ class MTModel:
         for token_id, mask in zip(tokens['input_ids'][0], tokens['attention_mask'][0]):
             this_embed = weight[token_id] * mask
             embed.append(this_embed)
+        embed.pop() #last is eos padding -- will be added seemingly regardless (id = 0), so pop it off here
         return torch.stack(embed)
+
+    def compute_cos(embed1, embed2):
+        #first, average subword embeddings to get 1 embed per word
+        embed1_avg = torch.mean(embed1, dim=0).unsqueeze(0)
+        embed2_avg = torch.mean(embed2, dim=0).unsqueeze(0)
+        #second, compute cosine similarity
+        cos = torch.nn.CosineSimilarity(dim=0, eps=1e-6)
+        output = cos(embed1_avg, embed2_avg)
+        return output[0]
 
     # Given a seq of embeddings, return translated ids
     def translation_from_embed(self, embed):
