@@ -30,7 +30,7 @@ class MTModel:
         embed1_avg = torch.mean(embed1, dim=0).unsqueeze(0)
         embed2_avg = torch.mean(embed2, dim=0).unsqueeze(0)
         #second, compute cosine similarity
-        cos = torch.nn.CosineSimilarity(dim=0, eps=1e-6)
+        cos = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
         output = cos(embed1_avg, embed2_avg)
         return output[0]
 
