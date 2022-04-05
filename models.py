@@ -4,13 +4,17 @@ Functions to load and use models
 import argparse
 import logging
 import time
-from transformers import AutoTokenizer, AutoModel
+#from transformers import AutoTokenizer, AutoModel
+from transformers import MarianTokenizer, MarianMTModel
+
 import torch
 
 class MTModel:
     def __init__(self, lang_pair) -> None:
-        self.tokenizer = AutoTokenizer.from_pretrained(f"Helsinki-NLP/opus-mt-{lang_pair}")
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(f"Helsinki-NLP/opus-mt-{lang_pair}")
+#        self.tokenizer = AutoTokenizer.from_pretrained(f"Helsinki-NLP/opus-mt-{lang_pair}")
+#        self.model = AutoModel.from_pretrained(f"Helsinki-NLP/opus-mt-{lang_pair}")
+        self.tokenizer = MarianTokenizer.from_pretrained(f"Helsinki-NLP/opus-mt-{lang_pair}")
+        self.model = MarianMTModel.from_pretrained(f"Helsinki-NLP/opus-mt-{lang_pair}")
         
     def get_embed_from_ind(self, ind):
         return self.model.get_input_embeddings().weight[ind]
@@ -25,7 +29,7 @@ class MTModel:
         embed.pop() #last idx is eos padding (id=0) -- will be added seemingly regardless of tokenization args, not needed for analysis, so pop it off here
         return torch.stack(embed)
 
-    def compute_cos(embed1, embed2):
+    def compute_cos(self, embed1, embed2):
         #first, average subword embeddings to get 1 embed per word
         embed1_avg = torch.mean(embed1, dim=0).unsqueeze(0)
         embed2_avg = torch.mean(embed2, dim=0).unsqueeze(0)
@@ -35,8 +39,8 @@ class MTModel:
         return output[0]
 
     # Given an input sentence string, return translation sentence string
-    def translation_from_string(input):
-        batch = self.tokenizer([input], return_tensors="pt")
+    def translation_from_string(self, source):
+        batch = self.tokenizer([source], return_tensors="pt")
         generated_ids = self.model.generate(**batch)
         output = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
         return output
