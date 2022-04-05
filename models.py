@@ -4,12 +4,11 @@ Functions to load and use models
 import argparse
 import logging
 import time
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, AutoModel
 import torch
 
 class MTModel:
     def __init__(self, lang_pair) -> None:
-
         self.tokenizer = AutoTokenizer.from_pretrained(f"Helsinki-NLP/opus-mt-{lang_pair}")
         self.model = AutoModelForSeq2SeqLM.from_pretrained(f"Helsinki-NLP/opus-mt-{lang_pair}")
         
@@ -23,7 +22,7 @@ class MTModel:
         for token_id, mask in zip(tokens['input_ids'][0], tokens['attention_mask'][0]):
             this_embed = weight[token_id] * mask
             embed.append(this_embed)
-        embed.pop() #last is eos padding -- will be added seemingly regardless (id = 0), so pop it off here
+        embed.pop() #last idx is eos padding (id=0) -- will be added seemingly regardless of tokenization args, not needed for analysis, so pop it off here
         return torch.stack(embed)
 
     def compute_cos(embed1, embed2):
@@ -35,12 +34,19 @@ class MTModel:
         output = cos(embed1_avg, embed2_avg)
         return output[0]
 
+    # Given an input sentence string, return translation sentence string
+    def translation_from_string(input):
+        batch = self.tokenizer([input], return_tensors="pt")
+        generated_ids = self.model.generate(**batch)
+        output = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+        return output
+
     # Given a seq of embeddings, return translated ids
     def translation_from_embed(self, embed):
         output = self.model(inputs_embeds=embed.unsqueeze(0), 
                             decoder_input_ids=torch.tensor([[0]]))
         last_hidden = output['encoder_last_hidden_state'] # batch X seqlen X embeddim
-
+        #requires modifying model methods
         pass
 
     # Given a seq of embeddings, swap tokens out for similar embeddings
