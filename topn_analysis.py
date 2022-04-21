@@ -5,8 +5,11 @@ import argparse
 import logging
 import time
 import torch
+import numpy as np
 import transformers
 import itertools
+import tqdm
+import pandas as pd
 from collections import defaultdict
 
 from models import MTModel
@@ -86,19 +89,21 @@ class color:
    UNDERLINE = '\033[4m'
    END = '\033[0m'
 
-#example: python analysis.py --lang_pair en-es --src "this is a test" --swap_idx 3 --swap_val sentence
+#example: python topn_analysis.py --lang_pair en-es --src "this is a test" --swap_idx 3 --swap_n 3
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--lang_pair')
-    parser.add_argument('--src')
-    parser.add_argument('--swap_idx', action='store', type=int)
-    parser.add_argument('--swap_val')
+    parser.add_argument('--lang_pair', required=True)
+    parser.add_argument('--src', required=True)
+    parser.add_argument('--swap_idx', type=int, required=True)
+    parser.add_argument('--swap_n', type=int)
+    parser.add_argument('--swap_percent', type=float)
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
 
     # -- swap analysis -- 
     start = time.time()
+    input_lang, output_lang = args.lang_pair.split('-')
 
     #instantiate model
     model    = MTModel(args.lang_pair)
@@ -109,27 +114,66 @@ if __name__=="__main__":
     out     = model.translation_from_string(src)
     s2t, _  = align(src,out)
 
-    #noised source
-    src_word = src.split()[ src_idx ]
-    src_swap = args.swap_val
-    src_cos  = model.compute_cos(model.get_embed_from_text(src_word), model.get_embed_from_text(src_swap))
-    print("cossim between src (%s) and sub (%s) is: %f." % (src_word, src_swap, src_cos))
+    src_list = src.split()
+    src_token_idx = model.tokenizer([src_list[ src_idx ]], return_tensors="pt", padding=True)
+    src_token_idx = src_token_idx['input_ids'][0, 0].item()
+    src_embed = model.get_embed_from_text(src)
 
-    #do swap
-    tmp = src.split()
-    tmp[src_idx] = src_swap
-    swap_src = ' '.join(tmp)
-    swap_out = model.translation_from_string(swap_src)
-    swap_s2t, _  = align(swap_src,swap_out)
-    
-    #noised output
-    out_word = get_out_token(src_idx, s2t, out)
-    out_swap = get_out_token(src_idx, swap_s2t, swap_out)
-    out_cos  = model.compute_cos(model.get_embed_from_text(out_word), model.get_embed_from_text(out_swap))
-    print("cossim between output (%s) and sub (%s) is: %f." % (out_word, out_swap, out_cos))    
+    tgt = model.translation_from_string(src)
+    tgt_embed = model.get_embed_from_text(tgt)
 
-    print(out)
-    print(swap_out)
+
+    # Get top 10 subwords 
+    src_token_cos_sim = np.load(f'precomputed_cos_sims/{input_lang}-{src_token_idx}.npy')['cos']
+    if args.swap_n:
+        swap_n = args.swap_n + 1 # Accounts for same word
+    elif args.swap_percent:
+        swap_n = int(src_token_cos_sim.shape[0] * args.swap_percent) + 1
+        print(swap_n)
+    else:
+        raise ValueError('Either --swap_n or --swap_percent required.')
+
+    top_N_sim = ind = np.argpartition(src_token_cos_sim, -(swap_n+1))[-(swap_n+1):]
+    swaps_tried = pd.DataFrame(columns=['swap_token_idx','swap_val', 'cos_input', 'cos_output', 'cos_diff'])
+    for swap_token_idx in tqdm.tqdm(top_N_sim):
+        if swap_token_idx != src_token_idx:
+            src_swap = src_list
+            swap_val = model.tokenizer.decode([swap_token_idx])
+            src_swap[ src_idx ] = swap_val
+            src_swap = ' '.join(src_swap)
+
+            src_cos  = model.compute_cos(src_embed, model.get_embed_from_text(src_swap)).detach()
+            # print("cossim between src (%s) and sub (%s) is: %f." % (src, src_swap, src_cos))
+
+            #do swap
+            tgt_swap = model.translation_from_string(src_swap)
+            
+            # swap_s2t, _  = align(src_swap,swap_out)
+            
+            #noised output
+            # out_word = get_out_token(src_idx, s2t, out)
+            # out_swap = get_out_token(src_idx, swap_s2t, swap_out)
+            out_cos  = model.compute_cos(tgt_embed, model.get_embed_from_text(tgt_swap)).detach()
+            # print("cossim between output (%s) and sub (%s) is: %f." % (tgt, tgt_swap, out_cos))    
+
+            cos_diff = np.abs(out_cos - src_cos)
+            # print(f'cossim diff = {cos_diff}')
+            swaps_tried = pd.concat([swaps_tried, 
+                                    pd.DataFrame.from_dict({
+                                        'swap_token_idx': [swap_token_idx],
+                                        'swap_val': [swap_val],
+                                        'src_swap': [src_swap],
+                                        'tgt_swap': [tgt_swap],
+                                        'cos_input': [src_cos.item()], 
+                                        'cos_output': [out_cos.item()],
+                                        'cos_diff': [np.abs(out_cos - src_cos).item()]})
+                                    ], 
+                                    ignore_index=True
+                                    )
+    swaps_tried = swaps_tried.sort_values('cos_diff', ascending=False)
+    print(swaps_tried.head(10))
+    swaps_tried.to_csv(f'output/{args.lang_pair}_{src_list[ src_idx ]}.csv', index=False)
+
 
     end = time.time()
-    logging.info(f'Time to run script: {end-start} secs')
+    logging.info(f'Time to run script: {(end-start)/60} mins')
