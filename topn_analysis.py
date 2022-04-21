@@ -100,6 +100,9 @@ if __name__=="__main__":
     parser.add_argument('--swap_percent', type=float)
     args = parser.parse_args()
 
+    if args.swap_percent and not 0 <= args.swap_percent <= 1:
+        parser.error("swap_percent should be a decimal percentage between 0 and 1")
+        
     logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
 
     # -- swap analysis -- 
@@ -124,17 +127,17 @@ if __name__=="__main__":
     tgt_embed = model.get_embed_from_text(tgt)
 
 
-    # Get top 10 subwords 
+    # Get top N subwords 
     src_token_cos_sim = np.load(f'precomputed_cos_sims/{input_lang}/{input_lang}-{src_token_idx}.npz')['cos']
     if args.swap_n:
         swap_n = args.swap_n + 1 # Accounts for same word
     elif args.swap_percent:
         swap_n = int(src_token_cos_sim.shape[0] * args.swap_percent) + 1
-        print(swap_n)
+        print(f"Swapping %0.3f%% yields %d swaps" % (args.swap_percent,swap_n))
     else:
         raise ValueError('Either --swap_n or --swap_percent required.')
 
-    top_N_sim = ind = np.argpartition(src_token_cos_sim, -(swap_n+1))[-(swap_n+1):]
+    top_N_sim = ind = np.argpartition(src_token_cos_sim, -(swap_n))[-(swap_n):]
     swaps_tried = pd.DataFrame(columns=['swap_token_idx','swap_val', 'cos_input', 'cos_output', 'cos_diff'])
     for swap_token_idx in tqdm.tqdm(top_N_sim):
         if swap_token_idx != src_token_idx:
