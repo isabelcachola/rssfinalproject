@@ -10,6 +10,7 @@ import transformers
 import itertools
 import tqdm
 import pandas as pd
+import os
 from collections import defaultdict
 
 from models import MTModel
@@ -124,7 +125,7 @@ if __name__=="__main__":
 
 
     # Get top 10 subwords 
-    src_token_cos_sim = np.load(f'precomputed_cos_sims/{input_lang}-{src_token_idx}.npy')['cos']
+    src_token_cos_sim = np.load(f'precomputed_cos_sims/{input_lang}/{input_lang}-{src_token_idx}.npz')['cos']
     if args.swap_n:
         swap_n = args.swap_n + 1 # Accounts for same word
     elif args.swap_percent:
@@ -172,6 +173,8 @@ if __name__=="__main__":
                                     )
     swaps_tried = swaps_tried.sort_values('cos_diff', ascending=False)
     print(swaps_tried.head(10))
+    if not os.path.exists('output'):
+        os.makedirs('output')
     swaps_tried.to_csv(f'output/{args.lang_pair}_{src_list[ src_idx ]}.csv', index=False)
 
 
