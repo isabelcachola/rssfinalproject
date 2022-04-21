@@ -63,14 +63,18 @@ class MTModel:
 
 def test_model(args):
     model = MTModel(args.lang_pair)
-    model.get_embed_from_text('this is an example')
-    import ipdb;ipdb.set_trace()
-    print()
+    out   = model.translation_from_string(args.src)
+    print(out)
+    return
+#    model.get_embed_from_text('this is an example')
+#    import ipdb;ipdb.set_trace()
+#    print()
 
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('lang_pair')
+    parser.add_argument('--lang_pair')
+    parser.add_argument('--src')
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
