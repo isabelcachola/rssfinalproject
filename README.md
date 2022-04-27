@@ -18,7 +18,7 @@ Esto es una prueba.
 INFO - Time to run script: 4.008340358734131 secs
 ```
 
-To run an individual swap, identify the (0-indexed) token you would like to swap with `swap_idx` and the value you would like to swap in with `swap_val`:
+To run an individual substitution with a specified swap, identify the (0-indexed) token you would like to swap with `swap_idx` and the value you would like to swap in with `swap_val`:
 ```
 $ python analysis.py --lang_pair en-es --src "this is a test" --swap_idx 3 --swap_val sentence
 cossim between src (test) and sub (sentence) is: 0.297076.
@@ -29,7 +29,13 @@ INFO - Time to run script: 13.224300146102905 secs
 ```
 
 To run top-N analysis, you will need the precomputed cosine similarity matrices for the language pair you are interested in.
-These are large (14G) and so not committed here, but should be put in the `precomputed_cos_sim` dir. 
+These are large (14G per language) and so not committed here, but should be put in the `precomputed_cos_sim` dir. 
+A small subset (for 10 words) have been added here to demonstrate functionality with the words in examples in this README.
+Those words are:
+```
+en: this, is, a, test, sentence, king, aid, queen
+es: perro, tengo
+```
 The tarred files are located on the clsp grid at: 
 ```
 /export/b02/icachola/rssfinalproject/precomputed_cos_sims/{en/es}.tar.gz
@@ -39,7 +45,7 @@ and expanded files at:
 /export/c24/salesky/rssfinalproject/precomputed_cos_sims/{en/es}/
 ```
 
-For top-n analysis, we again target a specific (0-indexed) token (`swap_idx`) in the source sentence (`--src "__"`) to be translated. 
+For top-N analysis, we again target a specific (0-indexed) token (`swap_idx`) in the source sentence (`--src "__"`) to be translated. 
 Top-N analysis can be computed using an integer N (`swap_n`) or a percentage N (`swap_percent`)
 ```
 $ python topn_analysis.py --lang_pair en-es --src "this is a sentence" --swap_idx 3 --swap_n 3
